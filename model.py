@@ -41,8 +41,9 @@ class RNNModel(nn.Module):
         elif rnn_type == 'QRNN':
             from torchqrnn import QRNNLayer
             self.rnns = [QRNNLayer(input_size=ninp if l == 0 else nhid,
-                                   (hidden_size=nhid if l != nlayers - 1
-                                    else (ninp if tie_weights else nhid)),
+                                   hidden_size=(nhid if l != nlayers - 1
+                                                else (ninp if tie_weights
+                                                      else nhid)),
                                    save_prev_x=True,
                                    zoneout=0,
                                    window=2 if l == 0 else 1,
