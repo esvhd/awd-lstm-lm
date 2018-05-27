@@ -4,7 +4,10 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
+# from torch.autograd import Variable
+
+import os
+import hashlib
 
 import data
 import model
@@ -60,9 +63,9 @@ parser.add_argument('--beta', type=float, default=1,
                     help='beta slowness regularization applied on RNN activiation (beta = 0 means no regularization)')
 parser.add_argument('--wdecay', type=float, default=1.2e-6,
                     help='weight decay applied to all weights')
-parser.add_argument('--resume', type=str,  default='',
+parser.add_argument('--resume', type=str, default='',
                     help='path of model to resume')
-parser.add_argument('--optimizer', type=str,  default='sgd',
+parser.add_argument('--optimizer', type=str, default='sgd',
                     help='optimizer to use (sgd, adam)')
 parser.add_argument('--when', nargs="+", type=int, default=[-1],
                     help='When (which epochs) to divide the learning rate by 10 - accepts multiple')
@@ -93,15 +96,13 @@ def model_load(fn):
     with open(fn, 'rb') as f:
         model, criterion, optimizer = torch.load(f)
 
-import os
-import hashlib
 
 fn = 'corpus.{}.data'.format(hashlib.md5(args.data.encode()).hexdigest())
 if os.path.exists(fn):
-    print('Loading cached dataset...')
+    print('Loading cached dataset from {}...'.format(fn))
     corpus = torch.load(fn)
 else:
-    print('Producing dataset...')
+    print('Producing dataset to {}...'.format(fn))
     corpus = data.Corpus(args.data)
     torch.save(corpus, fn)
 
@@ -148,8 +149,8 @@ if not criterion:
         # WikiText-103
         splits = [2800, 20000, 76000]
     print('Using', splits)
-    criterion = SplitCrossEntropyLoss(
-        args.emsize, splits=splits, verbose=False)
+    criterion = SplitCrossEntropyLoss(args.emsize, splits=splits,
+                                      verbose=False)
 ###
 if args.cuda:
     model = model.cuda()
@@ -183,7 +184,7 @@ def evaluate(data_source, batch_size=10):
                                             output,
                                             targets).data
         hidden = repackage_hidden(hidden)
-    return total_loss[0] / len(data_source)
+    return total_loss.item() / len(data_source)
 
 
 def train():
@@ -215,8 +216,8 @@ def train():
         hidden = repackage_hidden(hidden)
         optimizer.zero_grad()
 
-        output, hidden, rnn_hs, dropped_rnn_hs = model(
-            data, hidden, return_h=True)
+        output, hidden, rnn_hs, dropped_rnn_hs = model(data, hidden,
+                                                       return_h=True)
         raw_loss = criterion(model.decoder.weight,
                              model.decoder.bias, output, targets)
 
@@ -227,21 +228,23 @@ def train():
                               for dropped_rnn_h in dropped_rnn_hs[-1:])
         # Temporal Activation Regularization (slowness)
         if args.beta:
-            loss = loss + \
-                sum(args.beta * (rnn_h[1:] - rnn_h[:-1]
-                                 ).pow(2).mean() for rnn_h in rnn_hs[-1:])
+            loss = (loss +
+                    sum(args.beta *
+                        (rnn_h[1:] - rnn_h[:-1]).pow(2).mean()
+                        for rnn_h in rnn_hs[-1:]))
         loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in
         # RNNs / LSTMs.
         if args.clip:
-            torch.nn.utils.clip_grad_norm(params, args.clip)
+            torch.nn.utils.clip_grad_norm_(params, args.clip)
         optimizer.step()
 
         total_loss += raw_loss.data
         optimizer.param_groups[0]['lr'] = lr2
         if batch % args.log_interval == 0 and batch > 0:
-            cur_loss = total_loss[0] / args.log_interval
+            # cur_loss = total_loss[0] / args.log_interval
+            cur_loss = total_loss.item() / args.log_interval
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:05.5f} | '
                   'ms/batch {:5.2f} | loss {:5.2f} | ppl {:8.2f} | bpc {:8.3f}'
@@ -257,6 +260,7 @@ def train():
         ###
         batch += 1
         i += seq_len
+
 
 # Loop over epochs.
 lr = args.lr
@@ -296,7 +300,7 @@ try:
                           val_loss2 / math.log(2)))
             print('-' * 89)
 
-            if val_loss2 < stored_loss:
+            if val_loss2.item() < stored_loss:
                 model_save(args.save)
                 print('Saving Averaged!')
                 stored_loss = val_loss2

@@ -24,20 +24,22 @@ class RNNModel(nn.Module):
             self.rnns = [torch.nn.LSTM(ninp if l == 0 else nhid,
                                        nhid if l != nlayers - 1
                                        else (ninp if tie_weights else nhid),
-                                       1, dropout=0)
+                                       1,
+                                       dropout=0)
                          for l in range(nlayers)]
             if wdrop:
-                self.rnns = [WeightDrop(
-                    rnn, ['weight_hh_l0'], dropout=wdrop) for rnn in self.rnns]
+                self.rnns = [WeightDrop(rnn, ['weight_hh_l0'], dropout=wdrop)
+                             for rnn in self.rnns]
         if rnn_type == 'GRU':
             self.rnns = [torch.nn.GRU(ninp if l == 0 else nhid,
                                       nhid if l != nlayers - 1
-                                      else ninp,
-                                      1, dropout=0)
+                                      else (ninp if tie_weights else nhid),
+                                      1,
+                                      dropout=0)
                          for l in range(nlayers)]
             if wdrop:
-                self.rnns = [WeightDrop(
-                    rnn, ['weight_hh_l0'], dropout=wdrop) for rnn in self.rnns]
+                self.rnns = [WeightDrop(rnn, ['weight_hh_l0'], dropout=wdrop)
+                             for rnn in self.rnns]
         elif rnn_type == 'QRNN':
             from torchqrnn import QRNNLayer
             self.rnns = [QRNNLayer(input_size=ninp if l == 0 else nhid,
@@ -122,26 +124,24 @@ class RNNModel(nn.Module):
         return result, hidden
 
     def init_hidden(self, bsz):
-        weight = next(self.parameters()).data
+        # weight = next(self.parameters()).data
+        weight = next(self.parameters()).detach()
         if self.rnn_type == 'LSTM':
-            return [(Variable(weight
-                              .new(1, bsz,
-                                   self.nhid if l != self.nlayers - 1
-                                   else (self.ninp if self.tie_weights
-                                         else self.nhid))
-                              .zero_()),
-                     Variable(weight
-                              .new(1, bsz,
-                                   self.nhid if l != self.nlayers - 1
-                                   else (self.ninp if self.tie_weights
-                                         else self.nhid))
-                              .zero_()))
+            return [(weight.new(1, bsz,
+                                self.nhid if l != self.nlayers - 1
+                                else (self.ninp if self.tie_weights
+                                      else self.nhid))
+                     .zero_(),
+                     weight.new(1, bsz,
+                                self.nhid if l != self.nlayers - 1
+                                else (self.ninp if self.tie_weights
+                                      else self.nhid))
+                     .zero_())
                     for l in range(self.nlayers)]
         elif self.rnn_type == 'QRNN' or self.rnn_type == 'GRU':
-            return [Variable(weight
-                             .new(1, bsz,
-                                  self.nhid if l != self.nlayers - 1
-                                  else (self.ninp if self.tie_weights
-                                        else self.nhid))
-                             .zero_())
+            return [weight.new(1, bsz,
+                               self.nhid if l != self.nlayers - 1
+                               else (self.ninp if self.tie_weights
+                                     else self.nhid))
+                    .zero_()
                     for l in range(self.nlayers)]

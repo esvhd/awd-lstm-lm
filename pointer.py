@@ -54,7 +54,8 @@ criterion = nn.CrossEntropyLoss()
 def one_hot(idx, size, cuda=True):
     a = np.zeros((1, size), np.float32)
     a[0][idx] = 1
-    v = Variable(torch.from_numpy(a))
+    # v = Variable(torch.from_numpy(a))
+    v = torch.from_numpy(a)
     if cuda:
         v = v.cuda()
     return v
@@ -84,8 +85,14 @@ def evaluate(data_source, batch_size=10, window=args.window):
         next_word_history = torch.cat([one_hot(t.data[0], ntokens) for t in targets]) if next_word_history is None else torch.cat(
             [next_word_history, torch.cat([one_hot(t.data[0], ntokens) for t in targets])])
         # print(next_word_history)
-        pointer_history = Variable(rnn_out.data) if pointer_history is None else torch.cat(
-            [pointer_history, Variable(rnn_out.data)], dim=0)
+        # pointer_history = (Variable(rnn_out.data)
+        #                    if pointer_history is None
+        #                    else torch.cat([pointer_history,
+        #                                    Variable(rnn_out.data)], dim=0))
+        pointer_history = (rnn_out.detach()
+                           if pointer_history is None
+                           else torch.cat([pointer_history,
+                                           rnn_out.detach()], dim=0))
         # print(pointer_history)
         ###
         # Built-in cross entropy
@@ -124,6 +131,7 @@ def evaluate(data_source, batch_size=10, window=args.window):
         next_word_history = next_word_history[-window:]
         pointer_history = pointer_history[-window:]
     return total_loss / len(data_source)
+
 
 # Load the best saved model.
 with open(args.save, 'rb') as f:

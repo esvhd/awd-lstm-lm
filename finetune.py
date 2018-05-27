@@ -121,7 +121,8 @@ def evaluate(data_source, batch_size=10):
         data, targets = get_batch(data_source, i, args, evaluation=True)
         output, hidden = model(data, hidden)
         output_flat = output.view(-1, ntokens)
-        total_loss += len(data) * criterion(output_flat, targets).data
+        # total_loss += len(data) * criterion(output_flat, targets).data
+        total_loss += len(data) * criterion(output_flat, targets).detach()
         hidden = repackage_hidden(hidden)
     return total_loss[0] / len(data_source)
 

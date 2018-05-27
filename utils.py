@@ -1,12 +1,14 @@
 from torch.autograd import Variable
+import torch
 
 
 def repackage_hidden(h):
     """Wraps hidden states in new Variables, to detach them from their history.
     """
-    print('repackage_hidden:', type(h))
-    if type(h) == Variable:
-        return Variable(h.data)
+    # if type(h) == Variable:
+    #     return Variable(h.data)
+    if type(h) == torch.Tensor:
+        return h.detach()
     else:
         return tuple(repackage_hidden(v) for v in h)
 
@@ -25,6 +27,8 @@ def batchify(data, bsz, args):
 
 def get_batch(source, i, args, seq_len=None, evaluation=False):
     seq_len = min(seq_len if seq_len else args.bptt, len(source) - 1 - i)
-    data = Variable(source[i:i + seq_len], volatile=evaluation)
-    target = Variable(source[i + 1:i + 1 + seq_len].view(-1))
+    # data = Variable(source[i:i + seq_len], volatile=evaluation)
+    # target = Variable(source[i + 1:i + 1 + seq_len].view(-1))
+    data = source[i:i + seq_len]
+    target = source[i + 1:i + 1 + seq_len].view(-1)
     return data, target
