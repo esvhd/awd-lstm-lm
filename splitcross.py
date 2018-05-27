@@ -52,7 +52,8 @@ class SplitCrossEntropyLoss(nn.Module):
             # random lists
             head_res = torch.nn.functional.linear(
                 hiddens, head_weight, bias=head_bias)
-            softmaxed_head_res = torch.nn.functional.log_softmax(head_res)
+            softmaxed_head_res = torch.nn.functional.log_softmax(head_res,
+                                                                 dim=0)
 
         if splits is None:
             splits = list(range(self.nsplits))
@@ -80,7 +81,8 @@ class SplitCrossEntropyLoss(nn.Module):
                 # Then we calculate p(tombstone) * p(word in tombstone)
                 # Adding is equivalent to multiplication in log space
                 head_entropy = (softmaxed_head_res[:, -idx]).contiguous()
-                tail_entropy = torch.nn.functional.log_softmax(tail_res)
+                tail_entropy = torch.nn.functional.log_softmax(tail_res,
+                                                               dim=0)
                 results.append(head_entropy.view(-1, 1) + tail_entropy)
 
         if len(results) > 1:
@@ -167,7 +169,8 @@ class SplitCrossEntropyLoss(nn.Module):
         ###
         all_head_res = torch.nn.functional.linear(
             combo, head_weight, bias=head_bias)
-        softmaxed_all_head_res = torch.nn.functional.log_softmax(all_head_res)
+        softmaxed_all_head_res = torch.nn.functional.log_softmax(all_head_res,
+                                                                 dim=0)
         if self.verbose or verbose:
             self.stats[0].append(combo.size()[0] * head_weight.size()[0])
 
@@ -211,8 +214,9 @@ class SplitCrossEntropyLoss(nn.Module):
                 indices = (split_targets[idx] - self.splits[idx]).view(-1, 1)
                 # Warning: if you don't squeeze, you get an N x 1 return, which
                 # acts oddly with broadcasting
-                tail_entropy = torch.gather(torch.nn.functional.log_softmax(
-                    tail_res), dim=1, index=indices).squeeze()
+                tail_entropy = torch.gather(torch.nn.functional
+                                            .log_softmax(tail_res, dim=0),
+                                            dim=1, index=indices).squeeze()
                 entropy = -(head_entropy + tail_entropy)
             ###
             running_offset += len(split_hiddens[idx])
@@ -241,10 +245,15 @@ if __name__ == '__main__':
         list(embed.parameters()) + list(crit.parameters()), lr=1)
 
     for _ in range(E):
-        prev = torch.autograd.Variable(
-            (torch.rand(N, 1) * 0.999 * V).int().long())
-        x = torch.autograd.Variable(
-            (torch.rand(N, 1) * 0.999 * V).int().long())
+        # prev = torch.autograd.Variable((torch.rand(N, 1) * 0.999 * V).int()
+        #                                .long())
+        # x = torch.autograd.Variable((torch.rand(N, 1) * 0.999 * V).int()
+        #                             .long())
+        prev = (torch.rand(N, 1) * 0.999 * V).int().long()
+        x = (torch.rand(N, 1) * 0.999 * V).int().long()
+        prev.requires_grad_()
+        x.requires_grad_()
+
         y = embed(prev).squeeze()
         c = crit(embed.weight, bias, y, x.view(N))
         print('Crit', c.exp().data[0])
