@@ -17,6 +17,9 @@ def embedded_dropout(embed, words, dropout=0.1, scale=None):
         mask = mask.expand_as(embed.weight)
         mask.requires_grad_()
 
+        if embed.weight.is_cuda:
+            mask = mask.cuda()
+
         masked_embed_weight = mask * embed.weight
     else:
         masked_embed_weight = embed.weight

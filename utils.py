@@ -26,6 +26,8 @@ def batchify(data, bsz, args):
 
 
 def get_batch(source, i, args, seq_len=None, evaluation=False):
+    # esvhd: this mitigates the risk of drawing a larger seq_len
+    # the max seq_len would be len(source) - 1 - 0
     seq_len = min(seq_len if seq_len else args.bptt, len(source) - 1 - i)
     # data = Variable(source[i:i + seq_len], volatile=evaluation)
     # target = Variable(source[i + 1:i + 1 + seq_len].view(-1))
