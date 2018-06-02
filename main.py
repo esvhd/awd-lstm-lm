@@ -12,6 +12,7 @@ import hashlib
 import data
 import model
 
+from splitcross import SplitCrossEntropyLoss
 from utils import batchify, get_batch, repackage_hidden
 
 parser = argparse.ArgumentParser(
@@ -116,7 +117,6 @@ test_data = batchify(corpus.test, test_batch_size, args)
 # Build the model
 ###############################################################################
 
-from splitcross import SplitCrossEntropyLoss
 criterion = None
 
 ntokens = len(corpus.dictionary)
@@ -256,7 +256,7 @@ def train():
                           elapsed * 1000 / args.log_interval,
                           cur_loss,
                           math.exp(cur_loss),
-                          cur_loss / math.log(2)))
+                          cur_loss / math.log(2)), flush=True)
             total_loss = 0
             start_time = time.time()
         ###
@@ -300,9 +300,9 @@ try:
                           val_loss2,
                           math.exp(val_loss2),
                           val_loss2 / math.log(2)))
-            print('-' * 89)
+            print('-' * 89, flush=True)
 
-            if val_loss2.item() < stored_loss:
+            if val_loss2 < stored_loss:
                 model_save(args.save)
                 print('Saving Averaged!')
                 stored_loss = val_loss2
@@ -320,7 +320,7 @@ try:
                           val_loss,
                           math.exp(val_loss),
                           val_loss / math.log(2)))
-            print('-' * 89)
+            print('-' * 89, flush=True)
 
             if val_loss < stored_loss:
                 model_save(args.save)
@@ -331,7 +331,7 @@ try:
                     't0' not in optimizer.param_groups[0] and
                     (len(best_val_loss) > args.nonmono and
                         val_loss > min(best_val_loss[:-args.nonmono]))):
-                print('Switching to ASGD')
+                print('Switching to ASGD', flush=True)
                 optimizer = torch.optim.ASGD(model.parameters(),
                                              lr=args.lr, t0=0, lambd=0.,
                                              weight_decay=args.wdecay)
@@ -339,7 +339,7 @@ try:
             if epoch in args.when:
                 print('Saving model before learning rate decreased')
                 model_save('{}.e{}'.format(args.save, epoch))
-                print('Dividing learning rate by 10')
+                print('Dividing learning rate by 10', flush=True)
                 optimizer.param_groups[0]['lr'] /= 10.
 
             best_val_loss.append(val_loss)
@@ -357,4 +357,4 @@ print('=' * 89)
 print('| End of training | test loss {:5.2f} | test ppl {:8.2f} | '
       'test bpc {:8.3f}'
       .format(test_loss, math.exp(test_loss), test_loss / math.log(2)))
-print('=' * 89)
+print('=' * 89, flush=True)
