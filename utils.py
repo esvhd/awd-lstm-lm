@@ -7,7 +7,7 @@ def repackage_hidden(h):
     """
     # if type(h) == Variable:
     #     return Variable(h.data)
-    if type(h) == torch.Tensor:
+    if isinstance(h, torch.Tensor):
         return h.detach()
     else:
         return tuple(repackage_hidden(v) for v in h)

@@ -105,7 +105,7 @@ class RNNModel(nn.Module):
         raw_outputs = []
         outputs = []
         for l, rnn in enumerate(self.rnns):
-            current_input = raw_output
+            # current_input = raw_output
             raw_output, new_h = rnn(raw_output, hidden[l])
             new_hidden.append(new_h)
             raw_outputs.append(raw_output)
@@ -124,8 +124,8 @@ class RNNModel(nn.Module):
         return result, hidden
 
     def init_hidden(self, bsz):
-        # weight = next(self.parameters()).data
-        weight = next(self.parameters()).detach()
+        weight = next(self.parameters()).data
+        # weight = next(self.parameters()).detach()
         if self.rnn_type == 'LSTM':
             return [(weight.new(1, bsz,
                                 self.nhid if l != self.nlayers - 1

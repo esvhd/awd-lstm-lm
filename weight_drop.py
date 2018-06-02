@@ -48,6 +48,8 @@ class WeightDrop(torch.nn.Module):
                 mask = torch.nn.functional.dropout(mask,
                                                    p=self.dropout,
                                                    training=True)
+                # expand_as() here ensures the same mask is applied to all
+                # timesteps
                 w = mask.expand_as(raw_w) * raw_w
             else:
                 # self.training here is inherited from nn.Module.
