@@ -33,4 +33,9 @@ def get_batch(source, i, args, seq_len=None, evaluation=False):
     # target = Variable(source[i + 1:i + 1 + seq_len].view(-1))
     data = source[i:i + seq_len]
     target = source[i + 1:i + 1 + seq_len].view(-1)
+
+    # print('seq_len = ', seq_len)
+    # print('data.shape = ', data.shape)
+    # print('target.shape = ', target.shape)
+
     return data, target

@@ -4,11 +4,12 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
+# from torch.autograd import Variable
 
 import data
 import model
 
+from splitcross import SplitCrossEntropyLoss
 from utils import batchify, get_batch, repackage_hidden
 
 
@@ -22,7 +23,7 @@ def one_hot(idx, size, cuda=True):
     return v
 
 
-def evaluate(model, data_source, args, batch_size=10):
+def evaluate(model, data_source, ntokens, args, batch_size=10):
     window = args.window
 
     # Turn on evaluation mode which disables dropout.
@@ -32,7 +33,7 @@ def evaluate(model, data_source, args, batch_size=10):
     print(model)
     model.eval()
     total_loss = 0
-    ntokens = len(corpus.dictionary)
+    # ntokens = len(corpus.dictionary)
     hidden = model.init_hidden(batch_size)
     next_word_history = None
     pointer_history = None
@@ -45,8 +46,8 @@ def evaluate(model, data_source, args, batch_size=10):
         output_flat = output.view(-1, ntokens)
         ###
         # Fill pointer history
-        start_idx = len(
-            next_word_history) if next_word_history is not None else 0
+        start_idx = (len(next_word_history)
+                     if next_word_history is not None else 0)
         next_word_history = torch.cat([one_hot(t.item(), ntokens)
                                        for t in targets]) if next_word_history is None else torch.cat(
             [next_word_history, torch.cat([one_hot(t.item(), ntokens) for t in targets])])
@@ -118,6 +119,8 @@ if __name__ == '__main__':
                         help='mix between uniform distribution and pointer softmax distribution over previous words')
     parser.add_argument('--lambdasm', type=float, default=0.12785920428335693,
                         help='linear mix between only pointer (1) and only vocab (0) distribution')
+    parser.add_argument('--emsize', type=int, default=400,
+                        help='size of word embeddings')
     args = parser.parse_args()
 
     ###########################################################################
@@ -137,7 +140,23 @@ if __name__ == '__main__':
     ###########################################################################
 
     ntokens = len(corpus.dictionary)
-    criterion = nn.CrossEntropyLoss()
+
+    # criterion = nn.CrossEntropyLoss()
+    # master branch has a but here, see this:
+    # https://github.com/salesforce/awd-lstm-lm/issues/28
+    # it should not be using CrossEntropyLoss()
+    splits = []
+    if ntokens > 500000:
+        # One Billion
+        # This produces fairly even matrix mults for the buckets:
+        # 0: 11723136, 1: 10854630, 2: 11270961, 3: 11219422
+        splits = [4200, 35000, 180000]
+    elif ntokens > 75000:
+        # WikiText-103
+        splits = [2800, 20000, 76000]
+    print('Using', splits)
+    criterion = SplitCrossEntropyLoss(args.emsize, splits=splits,
+                                      verbose=False)
 
     # Load the best saved model.
     with open(args.save, 'rb') as f:
@@ -148,14 +167,14 @@ if __name__ == '__main__':
     print(model)
 
     # Run on val data.
-    val_loss = evaluate(model[0], val_data, args, test_batch_size)
+    val_loss = evaluate(model, val_data, ntokens, args, test_batch_size)
     print('=' * 89)
     print('| End of pointer | val loss {:5.2f} | val ppl {:8.2f}'.format(
         val_loss, math.exp(val_loss)))
     print('=' * 89, flush=True)
 
     # Run on test data.
-    test_loss = evaluate(model[0], test_data, args, test_batch_size)
+    test_loss = evaluate(model, test_data, ntokens, args, test_batch_size)
     print('=' * 89)
     print('| End of pointer | test loss {:5.2f} | test ppl {:8.2f}'.format(
         test_loss, math.exp(test_loss)))
