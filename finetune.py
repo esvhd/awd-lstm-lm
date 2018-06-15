@@ -5,11 +5,12 @@ import numpy as np
 np.random.seed(331)
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
+# from torch.autograd import Variable
 
 import data
 import model
 
+from splitcross import SplitCrossEntropyLoss
 from utils import batchify, get_batch, repackage_hidden
 
 parser = argparse.ArgumentParser(
@@ -102,7 +103,23 @@ total_params = sum(x.size()[0] * x.size()[1]
 print('Args:', args)
 print('Model total parameters:', total_params)
 
-criterion = nn.CrossEntropyLoss()
+
+# criterion = nn.CrossEntropyLoss()
+
+# master branch has a but here, see this:
+# https://github.com/salesforce/awd-lstm-lm/issues/28
+# it should not be using CrossEntropyLoss()
+splits = []
+if ntokens > 500000:
+    # One Billion
+    # This produces fairly even matrix mults for the buckets:
+    # 0: 11723136, 1: 10854630, 2: 11270961, 3: 11219422
+    splits = [4200, 35000, 180000]
+elif ntokens > 75000:
+    # WikiText-103
+    splits = [2800, 20000, 76000]
+print('Using', splits)
+criterion = SplitCrossEntropyLoss(args.emsize, splits=splits, verbose=False)
 
 ###############################################################################
 # Training code
@@ -117,14 +134,20 @@ def evaluate(data_source, batch_size=10):
     total_loss = 0
     ntokens = len(corpus.dictionary)
     hidden = model.init_hidden(batch_size)
-    for i in range(0, data_source.size(0) - 1, args.bptt):
-        data, targets = get_batch(data_source, i, args, evaluation=True)
-        output, hidden = model(data, hidden)
-        output_flat = output.view(-1, ntokens)
-        # total_loss += len(data) * criterion(output_flat, targets).data
-        total_loss += len(data) * criterion(output_flat, targets).detach()
-        hidden = repackage_hidden(hidden)
-    return total_loss[0] / len(data_source)
+    with torch.no_grad():
+        for i in range(0, data_source.size(0) - 1, args.bptt):
+            data, targets = get_batch(data_source, i, args, evaluation=True)
+            output, hidden = model(data, hidden)
+            # output_flat = output.view(-1, ntokens)
+            # # total_loss += len(data) * criterion(output_flat, targets).data
+            # print(output_flat.shape, ' vs. ', targets.shape)
+            # total_loss += len(data) * criterion(output_flat, targets)
+            total_loss += len(data) * criterion(model.decoder.weight,
+                                                model.decoder.bias,
+                                                output,
+                                                targets).detach()
+            hidden = repackage_hidden(hidden)
+    return total_loss.item() / len(data_source)
 
 
 def train():
@@ -158,7 +181,9 @@ def train():
 
         output, hidden, rnn_hs, dropped_rnn_hs = model(
             data, hidden, return_h=True)
-        raw_loss = criterion(output.view(-1, ntokens), targets)
+        # raw_loss = criterion(output.view(-1, ntokens), targets)
+        raw_loss = criterion(model.decoder.weight,
+                             model.decoder.bias, output, targets)
 
         loss = raw_loss
         # Activiation Regularization
@@ -178,7 +203,7 @@ def train():
         total_loss += raw_loss.data
         optimizer.param_groups[0]['lr'] = lr2
         if batch % args.log_interval == 0 and batch > 0:
-            cur_loss = total_loss[0] / args.log_interval
+            cur_loss = total_loss.item() / args.log_interval
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | '
                   'ms/batch {:5.2f} | loss {:5.2f} | ppl {:8.2f}'
@@ -188,7 +213,7 @@ def train():
                           optimizer.param_groups[0]['lr'],
                           elapsed * 1000 / args.log_interval,
                           cur_loss,
-                          math.exp(cur_loss)))
+                          math.exp(cur_loss)), flush=True)
             total_loss = 0
             start_time = time.time()
         ###
@@ -198,7 +223,7 @@ def train():
 
 # Load the best saved model.
 with open(args.save, 'rb') as f:
-    model = torch.load(f)
+    model = torch.load(f)[0]
 
 
 # Loop over epochs.
@@ -228,7 +253,7 @@ try:
                           (time.time() - epoch_start_time),
                           val_loss2,
                           math.exp(val_loss2)))
-            print('-' * 89)
+            print('-' * 89, flush=True)
 
             if val_loss2 < stored_loss:
                 with open(args.save, 'wb') as f:
@@ -264,4 +289,4 @@ test_loss = evaluate(test_data, test_batch_size)
 print('=' * 89)
 print('| End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
     test_loss, math.exp(test_loss)))
-print('=' * 89)
+print('=' * 89, flush=True)

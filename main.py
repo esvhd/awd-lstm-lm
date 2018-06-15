@@ -276,11 +276,13 @@ try:
     # model's weights as well as the criterion's weight (i.e. Adaptive
     # Softmax)
     if args.optimizer == 'sgd':
-        optimizer = torch.optim.SGD(
-            params, lr=args.lr, weight_decay=args.wdecay)
+        optimizer = torch.optim.SGD(params,
+                                    lr=args.lr,
+                                    weight_decay=args.wdecay)
     if args.optimizer == 'adam':
-        optimizer = torch.optim.Adam(
-            params, lr=args.lr, weight_decay=args.wdecay)
+        optimizer = torch.optim.Adam(params,
+                                     lr=args.lr,
+                                     weight_decay=args.wdecay)
     for epoch in range(1, args.epochs + 1):
         epoch_start_time = time.time()
         train()
