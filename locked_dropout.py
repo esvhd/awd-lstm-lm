@@ -21,6 +21,8 @@ class LockedDropout(nn.Module):
         m = (torch.zeros(1, x.size(1), x.size(2)) + (1 - dropout)).bernoulli()
         mask = m / (1 - dropout)
 
+        # x is output from RNN, x.shape == (seq_len, batch_size, x_dim)
+        # therefore by expanding_as(x) we use the same mask for all time steps.
         mask = mask.expand_as(x)
 
         if x.is_cuda:

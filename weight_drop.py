@@ -4,8 +4,30 @@ from functools import wraps
 
 
 class WeightDrop(torch.nn.Module):
-
     def __init__(self, module, weights, dropout=0, variational=False):
+        """
+        Weight dropout using DropConnect.
+
+        First, register new parameters for the recurrent weights.
+        Remove original parameters.
+
+        Everytime when fowrard is called, weight_hh_l0_raw is used, dropconnect
+        is applied to form new weights, and then registered as weight_hh_l0.
+
+        Because this weight is shared by reference, it will be used repeatedly
+        as foward() is called.
+
+        Parameters
+        ----------
+        module : TYPE
+
+        weights : TYPE
+
+        dropout : int, optional
+
+        variational : bool, optional
+
+        """
         super(WeightDrop, self).__init__()
         self.module = module
         self.weights = weights

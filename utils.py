@@ -38,4 +38,7 @@ def get_batch(source, i, args, seq_len=None, evaluation=False):
     # print('data.shape = ', data.shape)
     # print('target.shape = ', target.shape)
 
+    # data.shape == (seq_len,)
+    # target.shape == (seq_len, )
+
     return data, target

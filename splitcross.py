@@ -172,8 +172,9 @@ class SplitCrossEntropyLoss(nn.Module):
                            for i in range(self.nsplits)
                            if len(split_hiddens[i])])
         ###
-        all_head_res = torch.nn.functional.linear(
-            combo, head_weight, bias=head_bias)
+        all_head_res = torch.nn.functional.linear(combo,
+                                                  head_weight,
+                                                  bias=head_bias)
         # print('log_softmax 3: ', all_head_res.shape)
         softmaxed_all_head_res = torch.nn.functional.log_softmax(all_head_res,
                                                                  dim=-1)
